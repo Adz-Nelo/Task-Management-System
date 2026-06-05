@@ -6,6 +6,23 @@
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dracula (&:where(.dracula, .dracula *));
+
+/* Dracula Theme Colors */
+:root {
+    --dracula-bg: #282a36;
+    --dracula-bg-dark: #1e1f29;
+    --dracula-current-line: #44475a;
+    --dracula-foreground: #f8f8f2;
+    --dracula-comment: #6272a4;
+    --dracula-cyan: #8be9fd;
+    --dracula-green: #50fa7b;
+    --dracula-orange: #ffb86c;
+    --dracula-pink: #ff79c6;
+    --dracula-purple: #bd93f9;
+    --dracula-red: #ff5555;
+    --dracula-yellow: #f1fa8c;
+}
 
 .no-scrollbar::-webkit-scrollbar {
     display: none;
@@ -28,6 +45,10 @@
         background-color: #1c1c1e;
     }
 
+    .dracula ::-webkit-scrollbar-track {
+        background-color: var(--dracula-current-line);
+    }
+
     ::-webkit-scrollbar-thumb {
         background-color: #bbc3d1;
         border-radius: 0.375rem;
@@ -35,6 +56,10 @@
 
     .dark ::-webkit-scrollbar-thumb {
         background-color: #374151;
+    }
+
+    .dracula ::-webkit-scrollbar-thumb {
+        background-color: var(--dracula-purple);
     }
 
     ::-webkit-scrollbar-thumb:hover {
@@ -45,7 +70,11 @@
         background-color: #4b5563;
     }
 
-    .dark input[type="date"]::-webkit-calendar-picker-indicator {
+    .dracula ::-webkit-scrollbar-thumb:hover {
+        background-color: var(--dracula-pink);
+    }
+
+    .dracula input[type="date"]::-webkit-calendar-picker-indicator {
         filter: invert(100%);
     }
 
@@ -62,7 +91,15 @@
         background-color: #374151;
     }
 
+    .dracula input[type="checkbox"] {
+        background-color: var(--dracula-current-line);
+    }
+
     input[type="checkbox"]:checked {
         background-color: #3b82f6;
+    }
+
+    .dracula input[type="checkbox"]:checked {
+        background-color: var(--dracula-pink);
     }
 }
