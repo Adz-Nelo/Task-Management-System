@@ -56,8 +56,10 @@ const syncUserUpdate = inngest.createFunction(
 
 // Inngest function to save workspace data to a database
 const syncWorkspaceCreation = inngest.createFunction(
-  { id: "sync-workspace-from-clerk" },
-  { event: "clerk/workspace.created" },
+  {
+    id: "sync-workspace-from-clerk",
+    triggers: { event: "clerk/workspace.created" },
+  },
 
   async ({ event }) => {
     const { data } = event;
@@ -84,8 +86,10 @@ const syncWorkspaceCreation = inngest.createFunction(
 
 // Inngest function to update workspace data in database
 const syncWorkspaceUpdate = inngest.createFunction(
-  { id: "update-workspace-from-clerk" },
-  { event: "clerk/organization.updated" },
+  {
+    id: "update-workspace-from-clerk",
+    triggers: { event: "clerk/organization.updated" },
+  },
 
   async ({ event }) => {
     const { data } = event;
@@ -104,8 +108,10 @@ const syncWorkspaceUpdate = inngest.createFunction(
 
 // Inngest function to delete workspace from database
 const syncWorkspaceDeletion = inngest.createFunction(
-  { id: "delete-workspace-with-clerk" },
-  { event: "clerk/organization.deleted" },
+  {
+    id: "delete-workspace-with-clerk",
+    triggers: { event: "clerk/organization.deleted" },
+  },
 
   async ({ event }) => {
     const { data } = event;
@@ -119,8 +125,10 @@ const syncWorkspaceDeletion = inngest.createFunction(
 
 // Inngest function to save workspace member data to a database
 const syncWorkspaceMemberCreation = inngest.createFunction(
-  { id: "sync-workspace-member-from-clerk" },
-  { event: "clerk/organizationInvitation.accepted" },
+  {
+    id: "sync-workspace-member-from-clerk",
+    triggers: { event: "clerk/organizationInvitation.accepted" },
+  },
 
   async ({ event }) => {
     const { data } = event;
@@ -149,4 +157,6 @@ export const functions = [
 export const inngestServe = serve({
   client: inngest,
   functions,
+  serveHost: process.env.INNGEST_SERVE_HOST,
+  servePath: "/api/inngest",
 });
