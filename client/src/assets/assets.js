@@ -2,12 +2,14 @@ import workspace_img_default from "./workspace_img_default.png";
 import profile_img_a from "./profile_img_a.svg";
 import profile_img_o from "./profile_img_o.svg";
 import profile_img_j from "./profile_img_j.svg";
+import my_logo from "./MyLogo.webp";
 
 export const assets = {
     workspace_img_default,
     profile_img_a,
     profile_img_o,
     profile_img_j,
+    my_logo,
 }
 
 export const dummyUsers = [
@@ -46,7 +48,7 @@ export const dummyWorkspaces = [
         "settings": {},
         "ownerId": "user_3",
         "createdAt": "2025-10-13T06:55:44.423Z",
-        "image_url": workspace_img_default,
+        "image_url": my_logo,
         "updatedAt": "2025-10-13T07:17:36.890Z",
         "members": [
             {
@@ -263,7 +265,7 @@ export const dummyWorkspaces = [
         "settings": {},
         "ownerId": "user_3",
         "createdAt": "2025-10-13T08:19:36.035Z",
-        "image_url": workspace_img_default,
+        "image_url": my_logo,
         "updatedAt": "2025-10-13T08:19:36.035Z",
         "members": [
             {
