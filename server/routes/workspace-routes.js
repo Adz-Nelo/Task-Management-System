@@ -1,0 +1,9 @@
+import express from 'express';
+import { addMember, getUserWorkspaces } from '../controller/workspace-controller.js';
+
+const workspaceRouter = express.Router();
+
+workspaceRouter.get('/', getUserWorkspaces)
+workspaceRouter.post('/add-member', addMember)
+
+export default workspaceRouter;

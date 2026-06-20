@@ -3,6 +3,8 @@ import "dotenv/config";
 import cors from "cors";
 import { clerkMiddleware } from "@clerk/express";
 import { inngestServe } from "./inngest/index.js";
+import workspaceRouter from "./routes/workspace-routes.js";
+import { protect } from "./middleware/auth-middleware.js";
 
 const app = express();
 
@@ -14,6 +16,9 @@ app.get("/", (req, res) => res.send("Server is live!"));
 
 // Inngest HTTP endpoint
 app.use("/api/inngest", inngestServe);
+
+// Routes
+app.use("/api/workspaces", protect, workspaceRouter);
 
 const PORT = process.env.PORT || 5000;
 
