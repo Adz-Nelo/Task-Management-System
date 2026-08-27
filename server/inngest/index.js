@@ -63,24 +63,48 @@ const syncWorkspaceCreation = inngest.createFunction(
 
   async ({ event }) => {
     const { data } = event;
+
+    // Try to get the creator's user ID from the event data
+    // Clerk may provide it as created_by or inside the members array
+    let creatorId = data.created_by;
+    if (!creatorId && data.members && Array.isArray(data.members)) {
+      creatorId = data.members[0]?.user_id || data.members[0]?.userId;
+    }
+
     await prisma.workspace.create({
       data: {
         id: data.id,
         name: data.name,
         slug: data.slug,
-        ownerId: data.created_by,
+        ownerId: creatorId,
         image_url: data.image_url,
       },
     });
 
-    // Add creator as ADMIN member
-    await prisma.workspaceMember.create({
-      data: {
-        userId: data.created_by,
-        workspaceId: data.id,
-        role: "ADMIN",
-      },
-    });
+    // Add creator as ADMIN member (use upsert to avoid duplicate errors)
+    if (creatorId) {
+      const existingMember = await prisma.workspaceMember.findFirst({
+        where: {
+          userId: creatorId,
+          workspaceId: data.id,
+        },
+      });
+
+      if (existingMember) {
+        await prisma.workspaceMember.update({
+          where: { id: existingMember.id },
+          data: { role: "ADMIN" },
+        });
+      } else {
+        await prisma.workspaceMember.create({
+          data: {
+            userId: creatorId,
+            workspaceId: data.id,
+            role: "ADMIN",
+          },
+        });
+      }
+    }
   }
 );
 
