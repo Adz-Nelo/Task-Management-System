@@ -6,7 +6,7 @@ export const getUserWorkspaces = async (req, res) => {
     const { userId } = await req.auth();
     const workspaces = await prisma.workspace.findMany({
       where: {
-        members: { some: { userId: userId } },
+        OR: [{ members: { some: { userId: userId } } }, { ownerId: userId }],
       },
       include: {
         members: { include: { user: true } },
@@ -57,7 +57,7 @@ export const addMember = async (req, res) => {
     // fetch workspace
     const workspace = await prisma.workspace.findUnique({
       where: { id: workspaceId },
-      include: { members: true }, 
+      include: { members: true },
     });
 
     if (!workspace) {
@@ -65,28 +65,37 @@ export const addMember = async (req, res) => {
     }
 
     // Check creator has admin role
-    if (!workspace.members.find((member) => member.userId === userId && member.role === "ADMIN")) {
-      return res.status(401).json({ message: "You do not have admin privileges!" });
+    if (
+      !workspace.members.find(
+        (member) => member.userId === userId && member.role === "ADMIN"
+      )
+    ) {
+      return res
+        .status(401)
+        .json({ message: "You do not have admin privileges!" });
     }
 
     // Check if user is already a member
-    const existingMember = workspace.members.find((member) => member.userId === user.id);
+    const existingMember = workspace.members.find(
+      (member) => member.userId === user.id
+    );
 
     if (existingMember) {
-      return res.status(400).json({ message: "User is already a member of this workspace" });
+      return res
+        .status(400)
+        .json({ message: "User is already a member of this workspace" });
     }
 
     const member = await prisma.workspaceMember.create({
-        data: {
-            userId: user.id,
-            workspaceId,
-            role,
-            message
-        }
+      data: {
+        userId: user.id,
+        workspaceId,
+        role,
+        message,
+      },
     });
 
-    res.json({member, message: "Member added successfully"});
-
+    res.json({ member, message: "Member added successfully" });
   } catch (error) {
     console.log(error);
     res

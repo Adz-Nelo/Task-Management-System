@@ -24,8 +24,16 @@ const Layout = () => {
   useEffect(() => {
     if (isLoaded && user && workspaces.length === 0) {
       dispatch(fetchWorkspaces({ getToken }));
+
+      // Poll for workspaces every 3 seconds until we get results
+      // (Inngest functions run asynchronously, so the workspace may not exist immediately)
+      const interval = setInterval(() => {
+        dispatch(fetchWorkspaces({ getToken }));
+      }, 3000);
+
+      return () => clearInterval(interval);
     }
-  }, [user, isLoaded]);
+  }, [user, isLoaded, workspaces.length, dispatch, getToken]);
 
   if (!user) {
     return (
@@ -45,7 +53,11 @@ const Layout = () => {
   if (user && workspaces.length === 0) {
     return (
       <div className="min-h-screen flex justify-center items-center">
-        <CreateOrganization />
+        <CreateOrganization
+          afterCreateOrganization={() => {
+            dispatch(fetchWorkspaces({ getToken }));
+          }}
+        />
       </div>
     );
   }
