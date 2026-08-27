@@ -18,7 +18,7 @@ app.get("/", (req, res) => res.send("Server is live!"));
 app.use("/api/inngest", inngestServe);
 
 // Routes
-app.use("/api/workspaces", protect, workspaceRouter);
+app.use("/api/workspace", protect, workspaceRouter);
 
 const PORT = process.env.PORT || 5000;
 

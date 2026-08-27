@@ -93,11 +93,18 @@ const syncWorkspaceUpdate = inngest.createFunction(
 
   async ({ event }) => {
     const { data } = event;
-    await prisma.workspace.update({
+    await prisma.workspace.upsert({
       where: {
         id: data.id,
       },
-      data: {
+      create: {
+        id: data.id,
+        name: data.name,
+        slug: data.slug,
+        image_url: data.image_url,
+        ownerId: data.created_by,
+      },
+      update: {
         name: data.name,
         slug: data.slug,
         image_url: data.image_url,
