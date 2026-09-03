@@ -22,10 +22,14 @@ app.use("/api/inngest", inngestServe);
 
 // Routes
 app.use("/api/workspace", protect, workspaceRouter);
-app.use("/api/projects", protect, projectRouter); 
-app.use("/api/tasks", protect, taskRouter); 
-app.use("/api/comments", protect, commentRouter); 
+app.use("/api/projects", protect, projectRouter);
+app.use("/api/tasks", protect, taskRouter);
+app.use("/api/comments", protect, commentRouter);
 
-const PORT = process.env.PORT || 5000;
+// Only listen on a port when running locally (not on Vercel)
+if (process.env.VERCEL !== "1") {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+export default app;
