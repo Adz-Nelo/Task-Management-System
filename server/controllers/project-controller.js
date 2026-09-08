@@ -54,7 +54,6 @@ export const createProject = async (req, res) => {
         priority,
         progress,
         team_lead: teamLead?.id,
-        owner: { connect: { id: teamLead?.id } },
         start_date: start_date ? new Date(start_date) : null,
         end_date: end_date ? new Date(end_date) : null,
       },
