@@ -72,13 +72,20 @@ const syncWorkspaceCreation = inngest.createFunction(
       creatorId = data.members[0]?.user_id || data.members[0]?.userId;
     }
 
-    await prisma.workspace.create({
-      data: {
+    await prisma.workspace.upsert({
+      where: { id: data.id },
+      create: {
         id: data.id,
         name: data.name,
         slug: data.slug,
         ownerId: creatorId,
         image_url: data.image_url,
+      },
+      update: {
+        name: data.name,
+        slug: data.slug,
+        image_url: data.image_url,
+        ownerId: creatorId,
       },
     });
 
@@ -118,6 +125,8 @@ const syncWorkspaceUpdate = inngest.createFunction(
 
   async ({ event }) => {
     const { data } = event;
+    const creatorId = data.created_by;
+
     await prisma.workspace.upsert({
       where: {
         id: data.id,
@@ -127,7 +136,7 @@ const syncWorkspaceUpdate = inngest.createFunction(
         name: data.name,
         slug: data.slug,
         image_url: data.image_url,
-        ownerId: data.created_by,
+        ownerId: creatorId,
       },
       update: {
         name: data.name,
@@ -135,6 +144,31 @@ const syncWorkspaceUpdate = inngest.createFunction(
         image_url: data.image_url,
       },
     });
+
+    // Add creator as ADMIN member if not already a member
+    if (creatorId) {
+      const existingMember = await prisma.workspaceMember.findFirst({
+        where: {
+          userId: creatorId,
+          workspaceId: data.id,
+        },
+      });
+
+      if (existingMember) {
+        await prisma.workspaceMember.update({
+          where: { id: existingMember.id },
+          data: { role: "ADMIN" },
+        });
+      } else {
+        await prisma.workspaceMember.create({
+          data: {
+            userId: creatorId,
+            workspaceId: data.id,
+            role: "ADMIN",
+          },
+        });
+      }
+    }
   }
 );
 
