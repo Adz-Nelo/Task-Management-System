@@ -20,7 +20,7 @@ export const createProject = async (req, res) => {
     // check if user has admin role in the workspace
     const workspace = await prisma.workspace.findUnique({
       where: { id: workspaceId },
-      include: { members: { include: { user: true } } },
+      include: { members: { include: { user: true } }, owner: true },
     });
 
     if (!workspace) {
@@ -36,6 +36,21 @@ export const createProject = async (req, res) => {
       return res.status(403).json({
         message:
           "You don't have permission to create projects in this workspace",
+      });
+    }
+
+    // Ensure owner is included in members for project member addition
+    const workspaceMembers = [...workspace.members];
+    const ownerIsMember = workspaceMembers.some(
+      (member) => member.userId === workspace.ownerId
+    );
+    if (!ownerIsMember && workspace.owner) {
+      workspaceMembers.push({
+        id: `owner-${workspace.id}`,
+        userId: workspace.owner.id,
+        workspaceId: workspace.id,
+        role: "ADMIN",
+        user: workspace.owner,
       });
     }
 
@@ -61,19 +76,25 @@ export const createProject = async (req, res) => {
 
     // Add members to project if they are in the workspace
     if (team_members?.length > 0) {
+      const normalizedTeamMembers = team_members.map((email) =>
+        email.toLowerCase().trim()
+      );
       const membersToAdd = [];
-      workspace.members.forEach((member) => {
-        if (team_members.includes(member.user.email)) {
+      workspaceMembers.forEach((member) => {
+        const memberEmail = member.user.email.toLowerCase().trim();
+        if (normalizedTeamMembers.includes(memberEmail)) {
           membersToAdd.push(member.user.id);
         }
       });
 
-      await prisma.projectMember.createMany({
-        data: membersToAdd.map((memberId) => ({
-          projectId: project.id,
-          userId: memberId,
-        })),
-      });
+      if (membersToAdd.length > 0) {
+        await prisma.projectMember.createMany({
+          data: membersToAdd.map((memberId) => ({
+            projectId: project.id,
+            userId: memberId,
+          })),
+        });
+      }
     }
 
     const projectWithMembers = await prisma.project.findUnique({
