@@ -72,13 +72,19 @@ const syncWorkspaceCreation = inngest.createFunction(
       creatorId = data.members[0]?.user_id || data.members[0]?.userId;
     }
 
-    await prisma.workspace.create({
-      data: {
+    await prisma.workspace.upsert({
+      where: { id: data.id },
+      create: {
         id: data.id,
         name: data.name,
         slug: data.slug,
         ownerId: creatorId,
         image_url: data.image_url,
+      },
+      update: {
+        name: data.name,
+        slug: data.slug,
+        ownerId: creatorId,
       },
     });
 
@@ -118,6 +124,8 @@ const syncWorkspaceUpdate = inngest.createFunction(
 
   async ({ event }) => {
     const { data } = event;
+    const creatorId = data.created_by;
+
     await prisma.workspace.upsert({
       where: {
         id: data.id,
@@ -127,14 +135,39 @@ const syncWorkspaceUpdate = inngest.createFunction(
         name: data.name,
         slug: data.slug,
         image_url: data.image_url,
-        ownerId: data.created_by,
+        ownerId: creatorId,
       },
       update: {
         name: data.name,
         slug: data.slug,
-        image_url: data.image_url,
+        ownerId: creatorId,
       },
     });
+
+    // Add creator as ADMIN member if not already a member
+    if (creatorId) {
+      const existingMember = await prisma.workspaceMember.findFirst({
+        where: {
+          userId: creatorId,
+          workspaceId: data.id,
+        },
+      });
+
+      if (existingMember) {
+        await prisma.workspaceMember.update({
+          where: { id: existingMember.id },
+          data: { role: "ADMIN" },
+        });
+      } else {
+        await prisma.workspaceMember.create({
+          data: {
+            userId: creatorId,
+            workspaceId: data.id,
+            role: "ADMIN",
+          },
+        });
+      }
+    }
   }
 );
 
@@ -174,230 +207,164 @@ const syncWorkspaceMemberCreation = inngest.createFunction(
   }
 );
 
-// Inngest function to send email on task creation
-const sendTaskAssignmentEmail = inngest.createFunction(
-  { id: "send-task-assignment-mail", triggers: { event: "app/task.assigned" } },
+// Inngest function to send reminder email when task is overdue
+const sendTaskReminderEmail = inngest.createFunction(
+  { id: "send-task-reminder-mail", triggers: { event: "app/task.assigned" } },
   async ({ event, step }) => {
     const { taskId, origin } = event.data;
+    console.log(`Inngest reminder function triggered for task: ${taskId}`);
 
-    const task = await prisma.task.findUnique({
-      where: { id: taskId },
-      include: { assignee: true, project: true },
-    });
+    try {
+      const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        include: { assignee: true, project: true },
+      });
 
-    const taskDueDate = new Date(task.due_date).toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+      if (!task || !task.assignee) {
+        console.log(`Task ${taskId} has no assignee, skipping reminder.`);
+        return;
+      }
 
-    const htmlBody = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>New Task Assigned</title>
-      </head>
-      <body style="margin:0; padding:0; background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%); min-height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="min-height: 100vh; background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);">
-          <tr>
-            <td align="center" style="padding: 40px 20px;">
-              <table role="presentation" width="100%" max-width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background: #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.4);">
-                <!-- Header -->
-                <tr>
-                  <td style="background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%); padding: 32px 40px; text-align: center;">
-                    <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: 0.5px;">New Task Assigned</h1>
-                    <p style="margin: 8px 0 0 0; color: #93c5fd; font-size: 14px;">You have been assigned a new task</p>
-                  </td>
-                </tr>
-                <!-- Body -->
-                <tr>
-                  <td style="padding: 40px;">
-                    <p style="margin: 0 0 24px 0; color: #e2e8f0; font-size: 16px; line-height: 1.6;">Hi <strong style="color: #60a5fa;">${
-                      task.assignee.name
-                    }</strong>,</p>
-                    
-                    <p style="margin: 0 0 24px 0; color: #94a3b8; font-size: 15px; line-height: 1.6;">
-                      A new task has been assigned to you in <strong style="color: #e2e8f0;">${
-                        task.project.name
-                      }</strong>.
-                    </p>
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dueDate = new Date(task.due_date);
+      dueDate.setHours(0, 0, 0, 0);
 
-                    <!-- Task Card -->
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #0f172a; border-radius: 12px; border: 1px solid #334155; margin-bottom: 24px;">
-                      <tr>
-                        <td style="padding: 24px;">
-                          <p style="margin: 0 0 8px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Task Title</p>
-                          <p style="margin: 0 0 20px 0; color: #f1f5f9; font-size: 18px; font-weight: 600; line-height: 1.4;">${
-                            task.title
-                          }</p>
-                          
-                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                            <tr>
-                              <td width="50%" style="padding-right: 10px;">
-                                <p style="margin: 0 0 4px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Due Date</p>
-                                <p style="margin: 0; color: #e2e8f0; font-size: 14px; font-weight: 500;">${taskDueDate}</p>
-                              </td>
-                              <td width="50%" style="padding-left: 10px;">
-                                <p style="margin: 0 0 4px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Status</p>
-                                <p style="margin: 0; color: #e2e8f0; font-size: 14px; font-weight: 500; display: inline-block; padding: 2px 10px; background: #1e3a8a; color: #93c5fd; border-radius: 20px; font-size: 12px;">${task.status.replace(
-                                  "_",
-                                  " "
-                                )}</p>
-                              </td>
-                            </tr>
-                          </table>
-                        </td>
-                      </tr>
-                    </table>
+      console.log(
+        `Date check: today=${today.toISOString()}, dueDate=${dueDate.toISOString()}, shouldSleep=${
+          dueDate > today
+        }`
+      );
 
-                    <!-- CTA Button -->
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
-                      <tr>
-                        <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); border-radius: 8px; text-align: center;">
-                          <a href="${origin}" style="display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 8px;">View Task</a>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                <!-- Footer -->
-                <tr>
-                  <td style="background: #0f172a; padding: 20px 40px; text-align: center; border-top: 1px solid #334155;">
-                    <p style="margin: 0; color: #64748b; font-size: 12px;">Task Management System</p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </body>
-      </html>
-    `;
+      if (dueDate > today) {
+        console.log(`Sleeping until due date: ${task.due_date}`);
+        await step.sleepUntil("wait-for-the-due-date", new Date(task.due_date));
+      }
 
-    await sendEmail({
-      to: task.assignee.email,
-      subject: `New Task Assigned in ${task.project.name}`,
-      body: htmlBody,
-    });
+      const updatedTask = await prisma.task.findUnique({
+        where: { id: taskId },
+        include: { assignee: true, project: true },
+      });
 
-    if (taskDueDate !== new Date().toDateString()) {
-      await step.sleepUntil("wait-for-the-due-date", new Date(task.due_date));
-      await step.run("check-if-task-is-completed", async () => {
-        const task = await prisma.task.findUnique({
-          where: { id: taskId },
-          include: { assignee: true, project: true },
+      if (!updatedTask || !updatedTask.assignee) {
+        console.log(
+          `Task ${taskId} has no assignee after sleep, skipping reminder.`
+        );
+        return;
+      }
+
+      if (updatedTask.status !== "DONE") {
+        const reminderDueDate = new Date(
+          updatedTask.due_date
+        ).toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
         });
 
-        if (!task) return;
+        const reminderHtmlBody = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Task Reminder</title>
+          </head>
+          <body style="margin:0; padding:0; background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%); min-height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="min-height: 100vh; background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);">
+              <tr>
+                <td align="center" style="padding: 40px 20px;">
+                  <table role="presentation" width="100%" max-width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background: #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.4);">
+                    <!-- Header -->
+                    <tr>
+                      <td style="background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%); padding: 32px 40px; text-align: center;">
+                        <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: 0.5px;">Task Reminder</h1>
+                        <p style="margin: 8px 0 0 0; color: #93c5fd; font-size: 14px;">This task is still pending</p>
+                      </td>
+                    </tr>
+                    <!-- Body -->
+                    <tr>
+                      <td style="padding: 40px;">
+                        <p style="margin: 0 0 24px 0; color: #e2e8f0; font-size: 16px; line-height: 1.6;">Hi <strong style="color: #60a5fa;">${
+                          updatedTask.assignee.name
+                        }</strong>,</p>
+                        
+                        <p style="margin: 0 0 24px 0; color: #94a3b8; font-size: 15px; line-height: 1.6;">
+                          This is a friendly reminder that the following task in <strong style="color: #e2e8f0;">${
+                            updatedTask.project.name
+                          }</strong> is still pending and past its due date.
+                        </p>
 
-        if (task.status !== "DONE") {
-          await step.run("send-task-reminder-mail", async () => {
-            const reminderDueDate = new Date(task.due_date).toLocaleDateString(
-              "en-US",
-              {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              }
-            );
+                        <!-- Task Card -->
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #0f172a; border-radius: 12px; border: 1px solid #334155; margin-bottom: 24px;">
+                          <tr>
+                            <td style="padding: 24px;">
+                              <p style="margin: 0 0 8px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Task Title</p>
+                              <p style="margin: 0 0 20px 0; color: #f1f5f9; font-size: 18px; font-weight: 600; line-height: 1.4;">${
+                                updatedTask.title
+                              }</p>
+                              
+                              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                  <td width="50%" style="padding-right: 10px;">
+                                    <p style="margin: 0 0 4px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Due Date</p>
+                                    <p style="margin: 0; color: #e2e8f0; font-size: 14px; font-weight: 500;">${reminderDueDate}</p>
+                                  </td>
+                                  <td width="50%" style="padding-left: 10px;">
+                                    <p style="margin: 0 0 4px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Status</p>
+                                    <p style="margin: 0; color: #e2e8f0; font-size: 14px; font-weight: 500; display: inline-block; padding: 2px 10px; background: #1e3a8a; color: #93c5fd; border-radius: 20px; font-size: 12px;">${updatedTask.status.replace(
+                                      "_",
+                                      " "
+                                    )}</p>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                        </table>
 
-            const reminderHtmlBody = `
-              <!DOCTYPE html>
-              <html>
-              <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Task Reminder</title>
-              </head>
-              <body style="margin:0; padding:0; background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%); min-height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="min-height: 100vh; background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);">
-                  <tr>
-                    <td align="center" style="padding: 40px 20px;">
-                      <table role="presentation" width="100%" max-width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; background: #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.4);">
-                        <!-- Header -->
-                        <tr>
-                          <td style="background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%); padding: 32px 40px; text-align: center;">
-                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: 0.5px;">Task Reminder</h1>
-                            <p style="margin: 8px 0 0 0; color: #93c5fd; font-size: 14px;">This task is still pending</p>
-                          </td>
-                        </tr>
-                        <!-- Body -->
-                        <tr>
-                          <td style="padding: 40px;">
-                            <p style="margin: 0 0 24px 0; color: #e2e8f0; font-size: 16px; line-height: 1.6;">Hi <strong style="color: #60a5fa;">${
-                              task.assignee.name
-                            }</strong>,</p>
-                            
-                            <p style="margin: 0 0 24px 0; color: #94a3b8; font-size: 15px; line-height: 1.6;">
-                              This is a friendly reminder that the following task in <strong style="color: #e2e8f0;">${
-                                task.project.name
-                              }</strong> is still pending and past its due date.
-                            </p>
+                        <!-- CTA Button -->
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+                          <tr>
+                            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); border-radius: 8px; text-align: center;">
+                              <a href="${origin}" style="display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 8px;">View Task</a>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                      <td style="background: #0f172a; padding: 20px 40px; text-align: center; border-top: 1px solid #334155;">
+                        <p style="margin: 0; color: #64748b; font-size: 12px;">Task Management System</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
+        `;
 
-                            <!-- Task Card -->
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #0f172a; border-radius: 12px; border: 1px solid #334155; margin-bottom: 24px;">
-                              <tr>
-                                <td style="padding: 24px;">
-                                  <p style="margin: 0 0 8px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Task Title</p>
-                                  <p style="margin: 0 0 20px 0; color: #f1f5f9; font-size: 18px; font-weight: 600; line-height: 1.4;">${
-                                    task.title
-                                  }</p>
-                                  
-                                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                                    <tr>
-                                      <td width="50%" style="padding-right: 10px;">
-                                        <p style="margin: 0 0 4px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Due Date</p>
-                                        <p style="margin: 0; color: #e2e8f0; font-size: 14px; font-weight: 500;">${reminderDueDate}</p>
-                                      </td>
-                                      <td width="50%" style="padding-left: 10px;">
-                                        <p style="margin: 0 0 4px 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Status</p>
-                                        <p style="margin: 0; color: #e2e8f0; font-size: 14px; font-weight: 500; display: inline-block; padding: 2px 10px; background: #1e3a8a; color: #93c5fd; border-radius: 20px; font-size: 12px;">${task.status.replace(
-                                          "_",
-                                          " "
-                                        )}</p>
-                                      </td>
-                                    </tr>
-                                  </table>
-                                </td>
-                              </tr>
-                            </table>
-
-                            <!-- CTA Button -->
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
-                              <tr>
-                                <td style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); border-radius: 8px; text-align: center;">
-                                  <a href="${origin}" style="display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 8px;">View Task</a>
-                                </td>
-                              </tr>
-                            </table>
-                          </td>
-                        </tr>
-                        <!-- Footer -->
-                        <tr>
-                          <td style="background: #0f172a; padding: 20px 40px; text-align: center; border-top: 1px solid #334155;">
-                            <p style="margin: 0; color: #64748b; font-size: 12px;">Task Management System</p>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-              </body>
-              </html>
-            `;
-
-            await sendEmail({
-              to: task.assignee.email,
-              subject: `Reminder: ${task.title} is still pending`,
-              body: reminderHtmlBody,
-            });
+        try {
+          await sendEmail({
+            to: updatedTask.assignee.email,
+            subject: `Reminder: ${updatedTask.title} is still pending`,
+            body: reminderHtmlBody,
           });
+          console.log(
+            `Reminder email sent successfully to: ${updatedTask.assignee.email}`
+          );
+        } catch (emailError) {
+          console.error("Failed to send task reminder email:", emailError);
+          throw emailError;
         }
-      });
+      }
+    } catch (error) {
+      console.error("Inngest reminder function failed:", error);
+      throw error;
     }
   }
 );
@@ -411,7 +378,7 @@ export const functions = [
   syncWorkspaceUpdate,
   syncWorkspaceDeletion,
   syncWorkspaceMemberCreation,
-  sendTaskAssignmentEmail,
+  sendTaskReminderEmail,
 ];
 
 // Export the Express serve handler

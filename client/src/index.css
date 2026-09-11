@@ -74,8 +74,34 @@
         background-color: var(--dracula-pink);
     }
 
+    .dark input[type="date"]::-webkit-calendar-picker-indicator,
     .dracula input[type="date"]::-webkit-calendar-picker-indicator {
         filter: invert(100%);
+    }
+
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 0;
+    }
+
+    .dialog-scroll::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .dialog-scroll::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .dialog-scroll::-webkit-scrollbar-thumb {
+        background-color: #94a3b8;
+        border-radius: 2px;
+    }
+
+    .dark .dialog-scroll::-webkit-scrollbar-thumb {
+        background-color: #4b5563;
+    }
+
+    .dracula .dialog-scroll::-webkit-scrollbar-thumb {
+        background-color: #6272a4;
     }
 
     input[type="checkbox"] {

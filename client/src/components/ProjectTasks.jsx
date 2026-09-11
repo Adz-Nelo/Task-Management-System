@@ -14,6 +14,8 @@ import {
   XIcon,
   Zap,
 } from "lucide-react";
+import { useAuth } from "@clerk/react";
+import api from "../configs/api";
 
 const typeIcons = {
   BUG: {
@@ -55,6 +57,7 @@ const priorityTexts = {
 };
 
 const ProjectTasks = ({ tasks }) => {
+  const { getToken } = useAuth();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [selectedTasks, setSelectedTasks] = useState([]);
@@ -92,9 +95,19 @@ const ProjectTasks = ({ tasks }) => {
   const handleStatusChange = async (taskId, newStatus) => {
     try {
       toast.loading("Updating status...");
+      const token = await getToken();
 
-      //  Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await api.put(
+        `/api/tasks/${taskId}`,
+        {
+          status: newStatus,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       let updatedTask = structuredClone(tasks.find((t) => t.id === taskId));
       updatedTask.status = newStatus;
@@ -114,12 +127,14 @@ const ProjectTasks = ({ tasks }) => {
         "Are you sure you want to delete the selected tasks?"
       );
       if (!confirm) return;
+      const token = await getToken();
 
       toast.loading("Deleting tasks...");
-
-      //  Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
+      await api.put(
+        "/api/tasks/delete",
+        { taskIds: selectedTasks },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       dispatch(deleteTask(selectedTasks));
 
       toast.dismissAll();
@@ -197,7 +212,7 @@ const ProjectTasks = ({ tasks }) => {
           <button
             type="button"
             onClick={handleDelete}
-            className="px-3 py-1 flex items-center gap-2 rounded bg-gradient-to-br from-indigo-400 to-indigo-500 dracula:from-[#ff5555] dracula:to-[#ff79c6] text-zinc-100 dark:text-zinc-200 dracula:text-[#282a36] text-sm transition-colors"
+            className="px-3 py-1 flex items-center gap-2 rounded bg-gradient-to-br from-indigo-400 to-indigo-500 dracula:from-[#ff5555] dracula:to-[#ff79c6] text-zinc-100 dark:text-zinc-200 dracula:text-sm transition-colors"
           >
             <Trash className="size-3" /> Delete
           </button>

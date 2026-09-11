@@ -24,7 +24,31 @@ export const getUserWorkspaces = async (req, res) => {
         owner: true,
       },
     });
-    res.json({ workspaces });
+
+    // Ensure owner is included in members if not already present
+    const workspacesWithOwnerAsMember = workspaces.map((workspace) => {
+      const ownerIsMember = workspace.members.some(
+        (member) => member.userId === workspace.ownerId
+      );
+      if (!ownerIsMember && workspace.owner) {
+        return {
+          ...workspace,
+          members: [
+            ...workspace.members,
+            {
+              id: `owner-${workspace.id}`,
+              userId: workspace.owner.id,
+              workspaceId: workspace.id,
+              role: "ADMIN",
+              user: workspace.owner,
+            },
+          ],
+        };
+      }
+      return workspace;
+    });
+
+    res.json({ workspaces: workspacesWithOwnerAsMember });
   } catch (error) {
     console.log(error);
     res
@@ -64,8 +88,9 @@ export const addMember = async (req, res) => {
       return res.status(404).json({ message: "Workspace not found" });
     }
 
-    // Check creator has admin role
+    // Check creator has admin role or is the workspace owner
     if (
+      workspace.ownerId !== userId &&
       !workspace.members.find(
         (member) => member.userId === userId && member.role === "ADMIN"
       )
