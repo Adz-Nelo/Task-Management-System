@@ -213,11 +213,21 @@ const sendTaskAssignmentEmail = inngest.createFunction(
   { id: "send-task-assignment-mail", triggers: { event: "app/task.assigned" } },
   async ({ event, step }) => {
     const { taskId, origin } = event.data;
+    console.log(`Inngest function triggered for task: ${taskId}`);
 
     const task = await prisma.task.findUnique({
       where: { id: taskId },
       include: { assignee: true, project: true },
     });
+
+    if (!task || !task.assignee) {
+      console.log(`Task ${taskId} has no assignee, skipping email.`);
+      return;
+    }
+
+    console.log(
+      `Task found: ${task.title}, assignee: ${task.assignee.email}, due_date: ${task.due_date}`
+    );
 
     const taskDueDate = new Date(task.due_date).toLocaleDateString("en-US", {
       weekday: "long",
@@ -311,13 +321,35 @@ const sendTaskAssignmentEmail = inngest.createFunction(
       </html>
     `;
 
-    await sendEmail({
-      to: task.assignee.email,
-      subject: `New Task Assigned in ${task.project.name}`,
-      body: htmlBody,
-    });
+    console.log(
+      `Attempting to send assignment email to: ${task.assignee.email} for task: ${task.title}`
+    );
+    try {
+      await sendEmail({
+        to: task.assignee.email,
+        subject: `New Task Assigned in ${task.project.name}`,
+        body: htmlBody,
+      });
+      console.log(
+        `Assignment email sent successfully to: ${task.assignee.email}`
+      );
+    } catch (emailError) {
+      console.error("Failed to send task assignment email:", emailError);
+    }
 
-    if (taskDueDate !== new Date().toDateString()) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(task.due_date);
+    dueDate.setHours(0, 0, 0, 0);
+
+    console.log(
+      `Date check: today=${today.toISOString()}, dueDate=${dueDate.toISOString()}, shouldSleep=${
+        dueDate > today
+      }`
+    );
+
+    if (dueDate > today) {
+      console.log(`Sleeping until due date: ${task.due_date}`);
       await step.sleepUntil("wait-for-the-due-date", new Date(task.due_date));
       await step.run("check-if-task-is-completed", async () => {
         const task = await prisma.task.findUnique({
@@ -325,7 +357,7 @@ const sendTaskAssignmentEmail = inngest.createFunction(
           include: { assignee: true, project: true },
         });
 
-        if (!task) return;
+        if (!task || !task.assignee) return;
 
         if (task.status !== "DONE") {
           await step.run("send-task-reminder-mail", async () => {
@@ -424,11 +456,15 @@ const sendTaskAssignmentEmail = inngest.createFunction(
               </html>
             `;
 
-            await sendEmail({
-              to: task.assignee.email,
-              subject: `Reminder: ${task.title} is still pending`,
-              body: reminderHtmlBody,
-            });
+            try {
+              await sendEmail({
+                to: task.assignee.email,
+                subject: `Reminder: ${task.title} is still pending`,
+                body: reminderHtmlBody,
+              });
+            } catch (emailError) {
+              console.error("Failed to send task reminder email:", emailError);
+            }
           });
         }
       });

@@ -13,7 +13,7 @@ export const createTask = async (req, res) => {
       status,
       priority,
       assigneeId,
-      dueDate,
+      due_date,
     } = req.body;
 
     const origin = req.get("origin");
@@ -47,7 +47,8 @@ export const createTask = async (req, res) => {
         priority,
         assigneeId,
         status,
-        due_date: new Date(dueDate),
+        type,
+        due_date: new Date(due_date),
       },
     });
 
@@ -56,12 +57,17 @@ export const createTask = async (req, res) => {
       include: { assignee: true },
     });
 
+    console.log(
+      `Sending Inngest event for task assignment: taskId=${task.id}, assigneeId=${task.assigneeId}`
+    );
     await inngest.send({
       name: "app/task.assigned",
       data: {
-        taskId: task.id, origin,
-      }
-    })
+        taskId: task.id,
+        origin,
+      },
+    });
+    console.log(`Inngest event sent successfully for task: ${task.id}`);
 
     res.json({ task: taskWithAssignee, message: "Task created successfully" });
   } catch (error) {
@@ -135,10 +141,10 @@ export const deleteTask = async (req, res) => {
     }
 
     await prisma.task.deleteMany({
-        where: { id: { in: taskIds } },
-    })
+      where: { id: { in: taskIds } },
+    });
 
-    res.json({message: "Task deleted successfully" });
+    res.json({ message: "Task deleted successfully" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.code || error.message });
