@@ -225,9 +225,12 @@ export const deleteTask = async (req, res) => {
   try {
     const { userId } = await req.auth();
     const { taskIds } = req.body;
+    console.log("Delete task request - taskIds:", taskIds, "userId:", userId);
+
     const tasks = await prisma.task.findMany({
       where: { id: { in: taskIds } },
     });
+    console.log("Found tasks:", tasks);
 
     if (tasks.length === 0) {
       return res.status(404).json({ message: "Tasks not found" });

@@ -28,7 +28,7 @@ const Navbar = ({ setIsSidebarOpen }) => {
             <input
               type="text"
               placeholder="Search projects, tasks..."
-              className="pl-8 pr-4 py-2 w-full bg-white  dracula:bg-[#44475a] border border-gray-300  dracula:border-[#6272a4] rounded-md text-sm text-gray-900  dracula:text-[#f8f8f2] placeholder-gray-400  dracula:placeholder-[#6272a4] focus:outline-none focus:ring-1 focus:ring-blue-500 :ring-blue-400 dracula:focus:ring-[#bd93f9] focus:border-blue-500 :border-blue-400 dracula:focus:border-[#bd93f9] transition"
+              className="w-full pl-10 text-sm pr-4 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 dracula:border-[#44475a] text-gray-900 dark:text-white dracula:text-[#f8f8f2] placeholder-gray-400 dark:placeholder-zinc-400 dracula:placeholder-[#6272a4] focus:border-blue-500 dracula:focus:border-[#bd93f9] outline-none"
             />
           </div>
         </div>

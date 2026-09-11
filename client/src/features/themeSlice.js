@@ -17,7 +17,7 @@ const themeSlice = createSlice({
 
       // Add the appropriate theme class
       if (theme === "dracula") {
-        document.documentElement.classList.add("dracula");
+        document.documentElement.classList.add("dracula", "dark");
       }
 
       state.theme = theme;
@@ -28,7 +28,7 @@ const themeSlice = createSlice({
 
       // Add the appropriate theme class
       if (action.payload === "dracula") {
-        document.documentElement.classList.add("dracula");
+        document.documentElement.classList.add("dracula", "dark");
       }
 
       state.theme = action.payload;
@@ -42,7 +42,7 @@ const themeSlice = createSlice({
 
         // Add the appropriate theme class
         if (theme === "dracula") {
-          document.documentElement.classList.add("dracula");
+          document.documentElement.classList.add("dracula", "dark");
         }
       }
     },

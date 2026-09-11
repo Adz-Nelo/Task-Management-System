@@ -2,8 +2,16 @@ import { format } from "date-fns";
 import { Plus, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import AddProjectMember from "./AddProjectMember";
+import { useDispatch } from "react-redux";
+import { useAuth } from "@clerk/react";
+import toast from "react-hot-toast";
+import api from "../configs/api";
+import { fetchWorkspaces } from "../features/workspaceSlice";
 
 export default function ProjectSettings({ project }) {
+  const dispatch = useDispatch();
+  const { getToken } = useAuth();
+
   const [formData, setFormData] = useState({
     name: "New Website Launch",
     description: "Initial launch for new web platform.",
@@ -19,6 +27,25 @@ export default function ProjectSettings({ project }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    toast.loading("Saving...");
+
+    try {
+      const { data } = await api.put("/api/projects", formData, {
+        headers: {
+          Authorization: `Bearer ${await getToken()}`,
+        },
+      });
+      setIsDialogOpen(false);
+      dispatch(fetchWorkspaces({ getToken }));
+      toast.dismissAll();
+      toast.success(data.message);
+    } catch (error) {
+      toast.dismissAll();
+      toast.error(error.response?.data?.message || error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   useEffect(() => {
@@ -26,7 +53,7 @@ export default function ProjectSettings({ project }) {
   }, [project]);
 
   const inputClasses =
-    "w-full px-3 py-2 rounded mt-2 border text-sm dark:bg-zinc-900 dracula:bg-[#282a36] border-zinc-300 dark:border-zinc-700 dracula:border-[#44475a] text-zinc-900 dark:text-zinc-300 dracula:text-[#f8f8f2]";
+    "w-full px-3 py-2 rounded mt-2 border text-sm dark:bg-zinc-900 dracula:bg-[#282a36] border-zinc-300 dark:border-zinc-700 dracula:border-[#44475a] text-zinc-900 dark:text-zinc-300 dracula:text-[#f8f8f2] focus:border-blue-500 dracula:focus:border-[#bd93f9] focus:outline-none";
 
   const cardClasses =
     "rounded-lg border p-6 not-dark:bg-white dark:bg-gradient-to-br dark:from-zinc-800/70 dark:to-zinc-900/50 dracula:bg-[#282a36] dracula:bg-gradient-to-br dracula:from-[#1e1f29] dracula:to-[#282a36] border-zinc-300 dark:border-zinc-800 dracula:border-[#44475a]";

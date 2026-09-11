@@ -174,22 +174,22 @@ export default function ProjectDetail() {
 
         <div className="mt-6">
           {activeTab === "tasks" && (
-            <div className=" dark:bg-zinc-900/40 dracula:bg-[#1e1f29]/40 rounded max-w-6xl">
+            <div className="max-w-6xl">
               <ProjectTasks tasks={tasks} />
             </div>
           )}
           {activeTab === "analytics" && (
-            <div className=" dark:bg-zinc-900/40 rounded max-w-6xl">
+            <div className="max-w-6xl">
               <ProjectAnalytics tasks={tasks} project={project} />
             </div>
           )}
           {activeTab === "calendar" && (
-            <div className=" dark:bg-zinc-900/40 rounded max-w-6xl">
+            <div className="max-w-6xl">
               <ProjectCalendar tasks={tasks} />
             </div>
           )}
           {activeTab === "settings" && (
-            <div className=" dark:bg-zinc-900/40 rounded max-w-6xl">
+            <div className="max-w-6xl">
               <ProjectSettings project={project} />
             </div>
           )}

@@ -1,8 +1,10 @@
 import { FolderOpen, CheckCircle, Users, AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
+import { useUser } from "@clerk/react";
 
 export default function StatsGrid() {
+  const { user } = useUser();
   const currentWorkspace = useSelector(
     (state) => state?.workspace?.currentWorkspace || null
   );
@@ -63,9 +65,7 @@ export default function StatsGrid() {
         myTasks: currentWorkspace.projects.reduce(
           (acc, project) =>
             acc +
-            project.tasks.filter(
-              (t) => t.assignee?.email === currentWorkspace.owner.email
-            ).length,
+            project.tasks.filter((t) => t.assignee?.id === user?.id).length,
           0
         ),
         overdueIssues: currentWorkspace.projects.reduce(
@@ -79,8 +79,10 @@ export default function StatsGrid() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 my-9">
-      {statCards.map(
-        ({ icon: Icon, title, value, subtitle, bgColor, textColor }, i) => (
+      {statCards.map((card, i) => {
+        const { title, value, subtitle, bgColor, textColor } = card;
+        const CardIcon = card.icon;
+        return (
           <div
             key={i}
             className="bg-white dark:bg-zinc-950 dark:bg-gradient-to-br dark:from-zinc-800/70 dark:to-zinc-900/50 dracula:bg-[#282a36] dracula:bg-gradient-to-br dracula:from-[#1e1f29] dracula:to-[#282a36] border border-zinc-200 dark:border-zinc-800 dracula:border-[#44475a] hover:border-zinc-300 dark:hover:border-zinc-700 dracula:hover:border-[#6272a4] transition duration-200 rounded-md"
@@ -101,13 +103,13 @@ export default function StatsGrid() {
                   )}
                 </div>
                 <div className={`p-3 rounded-xl ${bgColor} bg-opacity-20`}>
-                  <Icon size={20} className={textColor} />
+                  <CardIcon size={20} className={textColor} />
                 </div>
               </div>
             </div>
           </div>
-        )
-      )}
+        );
+      })}
     </div>
   );
 }
